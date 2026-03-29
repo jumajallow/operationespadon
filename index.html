@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Operation ESPADON — Arrest Map</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+  :root {
+    --navy:     #0b1f3a;
+    --deep:     #0d2847;
+    --ocean:    #103866;
+    --accent:   #00c8ff;
+    --gold:     #f0b429;
+    --danger:   #ff4e4e;
+    --amber:    #f4832a;
+    --violet:   #a78bfa;
+    --green:    #34d399;
+    --coral:    #f87171;
+    --surface:  rgba(13,40,71,0.92);
+    --border:   rgba(0,200,255,0.18);
+    --text:     #e8f4ff;
+    --muted:    rgba(232,244,255,0.5);
+    --font-head: 'Syne', sans-serif;
+    --font-body: 'DM Sans', sans-serif;
+    --font-mono: 'DM Mono', monospace;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: var(--font-body);
+    background: var(--navy);
+    color: var(--text);
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* ── TOP BAR ── */
+  header {
+    background: var(--deep);
+    border-bottom: 1px solid var(--border);
+    padding: 8px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+    z-index: 1000;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .header-left { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+
+  /* OPERATION ESPADON badge — bigger & more prominent */
+  .op-badge {
+    background: linear-gradient(135deg, rgba(0,200,255,0.18), rgba(0,200,255,0.08));
+    border: 1.5px solid var(--accent);
+    border-radius: 6px;
+    padding: 6px 14px;
+    font-family: var(--font-head);
+    font-size: 15px;
+    font-weight: 800;
+    color: var(--accent);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    text-shadow: 0 0 18px rgba(0,200,255,0.4);
+    white-space: nowrap;
+  }
+  .op-badge .op-icon { font-size: 11px; margin-right: 4px; opacity: 0.8; }
+
+  .header-title-block { display: flex; flex-direction: column; gap: 2px; }
+  header h1 {
+    font-family: var(--font-head);
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    color: var(--text);
+    line-height: 1.2;
+  }
+  header h1 span { color: var(--accent); }
+
+  /* Duration tag */
+  .op-duration {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--gold);
+    letter-spacing: 0.06em;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .op-duration::before {
+    content: '';
+    display: inline-block;
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--gold);
+    animation: blink 1.8s ease-in-out infinite;
+  }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+  /* Copyright */
+  .op-copyright {
+    font-size: 9px;
+    color: var(--muted);
+    letter-spacing: 0.05em;
+    font-family: var(--font-mono);
+    opacity: 0.7;
+  }
+
+  .header-stats {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .stat-pill {
+    display: flex; align-items: center; gap: 6px;
+    background: rgba(0,200,255,0.06);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 4px 10px;
+    font-size: 11px;
+    white-space: nowrap;
+  }
+  .stat-pill .num {
+    font-family: var(--font-mono);
+    font-weight: 500;
+    font-size: 13px;
+  }
+  .stat-pill .lbl { color: var(--muted); font-size: 10px; }
+
+  /* ── MAIN LAYOUT ── */
+  .main { display: flex; flex: 1; overflow: hidden; min-height: 0; }
+
+  /* ── SIDEBAR ── */
+  #sidebar {
+    width: 280px;
+    flex-shrink: 0;
+    background: var(--deep);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    z-index: 500;
+    transition: transform 0.3s ease;
+  }
+  .sidebar-head {
+    padding: 12px 14px 10px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .sidebar-head h2 {
+    font-family: var(--font-head);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+
+  /* Sidebar toggle for small screens */
+  #sidebar-toggle {
+    display: none;
+    position: absolute;
+    top: 50%;
+    left: 0;
+    transform: translateY(-50%);
+    z-index: 600;
+    background: var(--deep);
+    border: 1px solid var(--border);
+    border-left: none;
+    border-radius: 0 6px 6px 0;
+    padding: 10px 5px;
+    cursor: pointer;
+    color: var(--accent);
+    font-size: 12px;
+    writing-mode: vertical-rl;
+    letter-spacing: 0.1em;
+    font-family: var(--font-mono);
+    font-size: 9px;
+  }
+
+  /* Filter tabs */
+  .filter-tabs { display: flex; gap: 4px; flex-wrap: wrap; }
+  .ftab {
+    cursor: pointer;
+    padding: 3px 8px;
+    border-radius: 20px;
+    font-size: 10px;
+    font-weight: 500;
+    border: 1px solid transparent;
+    transition: all 0.2s;
+    display: flex; align-items: center; gap: 4px;
+    letter-spacing: 0.02em;
+  }
+  .ftab.active { border-color: currentColor; }
+  .ftab-dot { width: 6px; height: 6px; border-radius: 50%; }
+
+  /* Vessel list */
+  #vessel-list { overflow-y: auto; flex: 1; padding: 8px; }
+  #vessel-list::-webkit-scrollbar { width: 3px; }
+  #vessel-list::-webkit-scrollbar-track { background: transparent; }
+  #vessel-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  .vessel-item {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 9px 11px;
+    margin-bottom: 5px;
+    cursor: pointer;
+    transition: all 0.2s;
+    background: rgba(255,255,255,0.02);
+    position: relative;
+    overflow: hidden;
+  }
+  .vessel-item:hover { background: rgba(0,200,255,0.06); border-color: rgba(0,200,255,0.3); }
+  .vessel-item.active { background: rgba(0,200,255,0.1); border-color: var(--accent); }
+  .vessel-item.hidden { display: none; }
+
+  .vi-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 6px; }
+  .vi-num { font-family: var(--font-mono); font-size: 9px; color: var(--muted); flex-shrink: 0; margin-top: 2px; }
+  .vi-name { font-family: var(--font-head); font-size: 12px; font-weight: 600; line-height: 1.2; flex: 1; }
+  .vi-eez {
+    font-size: 8px; padding: 2px 5px; border-radius: 10px;
+    font-weight: 500; letter-spacing: 0.03em; flex-shrink: 0; border: 1px solid;
+    max-width: 70px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .vi-reason { font-size: 10px; color: var(--muted); margin-top: 5px; line-height: 1.4; }
+  .vi-coords { font-family: var(--font-mono); font-size: 9px; color: rgba(0,200,255,0.5); margin-top: 4px; }
+
+  /* ── MAP ── */
+  #map { flex: 1; position: relative; min-width: 0; }
+
+  /* ── LEAFLET OVERRIDES ── */
+  .leaflet-container { background: #0a1929 !important; }
+  .leaflet-control-zoom a {
+    background: var(--deep) !important;
+    color: var(--accent) !important;
+    border-color: var(--border) !important;
+  }
+  .leaflet-control-zoom a:hover { background: var(--ocean) !important; }
+  .leaflet-control-attribution {
+    background: rgba(13,40,71,0.8) !important;
+    color: var(--muted) !important;
+    font-size: 9px !important;
+  }
+  .leaflet-control-attribution a { color: var(--accent) !important; }
+
+  /* Custom popup */
+  .leaflet-popup-content-wrapper {
+    background: var(--surface) !important;
+    border: 1px solid var(--accent) !important;
+    border-radius: 10px !important;
+    backdrop-filter: blur(12px) !important;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5) !important;
+    padding: 0 !important;
+  }
+  .leaflet-popup-tip { background: var(--deep) !important; }
+  .leaflet-popup-content { margin: 0 !important; width: auto !important; }
+  .leaflet-popup-close-button { color: var(--muted) !important; right: 10px !important; top: 8px !important; font-size: 16px !important; }
+  .leaflet-popup-close-button:hover { color: var(--text) !important; }
+
+  .popup-inner { padding: 14px 16px; min-width: 210px; }
+  .popup-num { font-family: var(--font-mono); font-size: 10px; color: var(--muted); letter-spacing: 0.08em; margin-bottom: 4px; }
+  .popup-name { font-family: var(--font-head); font-size: 15px; font-weight: 700; line-height: 1.2; margin-bottom: 10px; }
+  .popup-row { display: flex; align-items: flex-start; gap: 8px; margin-bottom: 7px; font-size: 12px; }
+  .popup-label { color: var(--muted); min-width: 64px; flex-shrink: 0; font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; padding-top: 1px; }
+  .popup-val { color: var(--text); font-weight: 400; line-height: 1.4; }
+  .popup-coords { font-family: var(--font-mono); font-size: 11px; color: rgba(0,200,255,0.7); margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--border); }
+
+  /* EEZ / flag colors */
+  .eez-MR { color: #00c8ff; border-color: #00c8ff; background: rgba(0,200,255,0.1); }
+  .eez-SN { color: #34d399; border-color: #34d399; background: rgba(52,211,153,0.1); }
+  .eez-GM { color: #f0b429; border-color: #f0b429; background: rgba(240,180,41,0.1); }
+  .eez-GW { color: #a78bfa; border-color: #a78bfa; background: rgba(167,139,250,0.1); }
+  .eez-CV { color: #f87171; border-color: #f87171; background: rgba(248,113,113,0.1); }
+
+  /* ── EEZ LEGEND on map ── */
+  .map-legend {
+    position: absolute;
+    bottom: 28px; right: 10px;
+    z-index: 999;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 11px 13px;
+    min-width: 160px;
+    backdrop-filter: blur(8px);
+    pointer-events: none;
+  }
+  .ml-title { font-family: var(--font-head); font-size: 9px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; }
+  .ml-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; font-size: 10px; }
+  .ml-dot { width: 9px; height: 9px; border-radius: 50%; border: 2px solid; flex-shrink: 0; }
+  .ml-line { width: 18px; height: 0; border-top: 2px dashed; flex-shrink: 0; }
+  .ml-sep { border-top: 1px solid var(--border); margin: 6px 0; }
+  .ml-label { color: var(--muted); }
+
+  /* ── Toast ── */
+  #toast {
+    position: fixed;
+    top: 70px; left: 50%;
+    transform: translateX(-50%) translateY(-10px);
+    background: var(--surface);
+    border: 1px solid var(--accent);
+    border-radius: 8px;
+    padding: 8px 16px;
+    font-size: 12px;
+    color: var(--accent);
+    opacity: 0;
+    pointer-events: none;
+    transition: all 0.3s;
+    z-index: 9999;
+    font-family: var(--font-mono);
+    letter-spacing: 0.05em;
+    white-space: nowrap;
+  }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  /* ── RESPONSIVE ── */
+  @media (max-width: 768px) {
+    body { overflow: auto; }
+    .main { flex-direction: column; overflow: visible; height: auto; }
+
+    header { padding: 8px 12px; }
+    .op-badge { font-size: 12px; padding: 5px 10px; }
+    header h1 { font-size: 11px; }
+    .header-stats { gap: 5px; }
+    .stat-pill { padding: 3px 8px; }
+    .stat-pill .num { font-size: 12px; }
+
+    #sidebar {
+      width: 100%;
+      max-height: 280px;
+      border-right: none;
+      border-bottom: 1px solid var(--border);
+    }
+    #map { height: 60vh; min-height: 350px; flex: none; }
+    .map-legend { bottom: 10px; right: 6px; padding: 8px 10px; min-width: 130px; }
+    .ml-title { font-size: 8px; }
+    .ml-row { font-size: 9px; }
+  }
+
+  @media (max-width: 480px) {
+    .op-badge { font-size: 11px; letter-spacing: 0.06em; }
+    header h1 { display: none; }
+    .header-stats { width: 100%; justify-content: flex-start; }
+    #sidebar { max-height: 240px; }
+    #map { height: 55vh; }
+    .map-legend { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-left">
+    <div class="op-badge"><span class="op-icon">⬛</span> OPERATION ESPADON</div>
+    <div class="header-title-block">
+      <h1>Senegal · Gambia · Mauritania · Cape Verde &mdash; <span>Arrest Position Map</span></h1>
+      <div class="op-duration">09 – 22 FEBRUARY 2026 &nbsp;·&nbsp; SRFC-EFCA COORDINATED JOINT OPERATION</div>
+      <div class="op-copyright">&copy; SRFC/CSRP 2026. All rights reserved.</div>
+    </div>
+  </div>
+  <div class="header-stats">
+    <div class="stat-pill"><span class="num" style="color:var(--danger)" id="stat-vessels">10</span><span class="lbl">Vessels Arrested</span></div>
+    <div class="stat-pill"><span class="num" style="color:var(--gold)">4</span><span class="lbl">EEZ Zones</span></div>
+    <div class="stat-pill"><span class="num" style="color:var(--green)" id="stat-types">5</span><span class="lbl">Offense Types</span></div>
+  </div>
+</header>
+
+<div class="main">
+  <div id="sidebar">
+    <div class="sidebar-head">
+      <h2>Arrested Vessels</h2>
+      <div class="filter-tabs" id="filter-tabs">
+        <div class="ftab active" data-filter="all" style="color:var(--text);border-color:rgba(255,255,255,0.3);background:rgba(255,255,255,0.06)">All (10)</div>
+        <div class="ftab" data-filter="vms"   style="color:var(--danger)"><div class="ftab-dot" style="background:var(--danger)"></div>VMS (2)</div>
+        <div class="ftab" data-filter="mesh"  style="color:var(--amber)"><div class="ftab-dot" style="background:var(--amber)"></div>Mesh (3)</div>
+        <div class="ftab" data-filter="multi" style="color:var(--violet)"><div class="ftab-dot" style="background:var(--violet)"></div>Multi (3)</div>
+        <div class="ftab" data-filter="psl"   style="color:var(--coral)"><div class="ftab-dot" style="background:var(--coral)"></div>PSL (1)</div>
+        <div class="ftab" data-filter="spear" style="color:var(--green)"><div class="ftab-dot" style="background:var(--green)"></div>Spear (1)</div>
+      </div>
+    </div>
+    <div id="vessel-list"></div>
+  </div>
+
+  <div id="map"></div>
+</div>
+
+<div class="map-legend">
+  <div class="ml-title">Legend</div>
+  <div class="ml-row"><div class="ml-dot" style="background:rgba(255,78,78,0.25);border-color:#ff4e4e"></div><span class="ml-label">VMS Failure</span></div>
+  <div class="ml-row"><div class="ml-dot" style="background:rgba(244,131,42,0.25);border-color:#f4832a"></div><span class="ml-label">Non-compliant Mesh</span></div>
+  <div class="ml-row"><div class="ml-dot" style="background:rgba(167,139,250,0.25);border-color:#a78bfa"></div><span class="ml-label">Multiple Offenses</span></div>
+  <div class="ml-row"><div class="ml-dot" style="background:rgba(248,113,113,0.2);border-color:#f87171"></div><span class="ml-label">PSL / Gear on Board</span></div>
+  <div class="ml-row"><div class="ml-dot" style="background:rgba(52,211,153,0.2);border-color:#34d399"></div><span class="ml-label">Unauth. Spearfishing</span></div>
+  <div class="ml-sep"></div>
+  <div class="ml-row"><div class="ml-line" style="border-color:#00c8ff"></div><span class="ml-label">Mauritania EEZ</span></div>
+  <div class="ml-row"><div class="ml-line" style="border-color:#34d399"></div><span class="ml-label">Senegal EEZ</span></div>
+  <div class="ml-row"><div class="ml-line" style="border-top-style:dashed;border-color:#f0b429"></div><span class="ml-label">The Gambia EEZ</span></div>
+  <div class="ml-row"><div class="ml-line" style="border-color:#f87171"></div><span class="ml-label">Cape Verde EEZ</span></div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// Coord converter: deg°min'sec" → decimal
+function dms(d, m, s) { return d + m/60 + s/3600; }
+
+const VESSELS = [
+  { id:1,  name:"ATOUMAY",            lat:13.3085,              lon:-17.4167,             reason:"Failure to transmit VMS",        type:"vms",   eez:"GM", flag:"Mauritania" },
+  { id:2,  name:"ABO SALEM 2",        lat:13.3638,              lon:-17.0603,             reason:"Failure to transmit VMS",        type:"vms",   eez:"GM", flag:"Gambia" },
+  { id:3,  name:"ABO ELGHEIT ELGDED", lat:13.0720,              lon:-17.0827,             reason:"Non-compliant mesh size",        type:"mesh",  eez:"SN", flag:"Gambia" },
+  { id:4,  name:"TEISSIR 2",          lat:19.3800,              lon:-16.8038,             reason:"Non-compliant mesh size",        type:"mesh",  eez:"MR", flag:"Mauritania" },
+  { id:5,  name:"ATLANTIDE 2",        lat:14.2933,              lon:-17.2270,             reason:"Non-compliant mesh size",        type:"mesh",  eez:"SN", flag:"Senegal" },
+  { id:6,  name:"MARZOUGH",           lat:16.9637,              lon:-19.4640,             reason:"Multiple offenses",              type:"multi", eez:"MR", flag:"Mauritania" },
+  { id:7,  name:"FUENTE DE MACELLE",  lat:16.9167,              lon:-19.2360,             reason:"Multiple offenses",              type:"multi", eez:"MR", flag:"Spain" },
+  { id:8,  name:"LORD MILES",         lat:16.9837,              lon:-19.4540,             reason:"Unauthorized foreign crew",      type:"multi", eez:"MR", flag:"Gambia" },
+  { id:9,  name:"SILVESTRA",          lat: dms(16,37,11.08),   lon:-dms(22,59,28.34),   reason:"PSL Fishing gear on board",      type:"psl",   eez:"CV", flag:"Cape Verde" },
+  { id:10, name:"DI NOS",             lat: dms(16,31,9.31),    lon:-dms(24,11,18.55),   reason:"Unauthorized spearfishing",      type:"spear", eez:"CV", flag:"Cape Verde" },
+];
+
+const TYPE_COLOR = {
+  vms:   "#ff4e4e",
+  mesh:  "#f4832a",
+  multi: "#a78bfa",
+  psl:   "#f87171",
+  spear: "#34d399",
+};
+const EEZ_COLOR = { MR:"#00c8ff", SN:"#34d399", GM:"#f0b429", GW:"#a78bfa", CV:"#f87171" };
+
+// ── INIT MAP ──
+const map = L.map('map', {
+  center: [16.0, -19.0],
+  zoom: 5,
+  zoomControl: true,
+  attributionControl: true,
+});
+
+L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+  attribution: '&copy; <a href="https://carto.com/">CartoDB</a> | EEZ: <a href="https://marineregions.org">Marine Regions</a>',
+  subdomains: 'abcd', maxZoom: 19
+}).addTo(map);
+
+// ── EEZ LAYERS — Marine Regions (Global Fishing Watch source) ──
+const EEZ_SOURCES = [
+  { mrgid: 8369, key:"MR", color:"#00c8ff", name:"Mauritania EEZ" },
+  { mrgid: 8371, key:"SN", color:"#34d399", name:"Senegal EEZ" },
+  { mrgid: 8372, key:"GM", color:"#f0b429", name:"The Gambia EEZ" },
+  { mrgid: 8373, key:"GW", color:"#a78bfa", name:"Guinea-Bissau EEZ" },
+  { mrgid: 8362, key:"CV", color:"#f87171", name:"Cape Verde EEZ" },
+];
+
+const eezLayers = {};
+
+async function loadEEZ(src) {
+  const url = `https://geo.vliz.be/geoserver/MarineRegions/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=MarineRegions:eez&outputFormat=application/json&CQL_FILTER=mrgid_eez=${src.mrgid}`;
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(res.status);
+    const geojson = await res.json();
+    const layer = L.geoJSON(geojson, {
+      style: {
+        color: src.color,
+        fillColor: src.color,
+        fillOpacity: 0.06,
+        weight: 1.5,
+        dashArray: src.key === 'GM' ? '4 4' : '8 5',
+        opacity: 0.75,
+      }
+    }).bindTooltip(
+      `<span style="font-family:'DM Mono',monospace;font-size:11px;color:${src.color};background:#0d2847;border:1px solid ${src.color}44;padding:4px 10px;border-radius:4px">${src.name}</span>`,
+      { sticky: true, className: 'eez-tooltip' }
+    ).addTo(map);
+    eezLayers[src.key] = layer;
+  } catch(e) {
+    console.warn(`EEZ load failed for ${src.name}:`, e);
+    showToast(`⚠ Could not load ${src.name} boundary`);
+  }
+}
+
+Promise.all(EEZ_SOURCES.map(loadEEZ));
+
+// ── VESSEL MARKERS ──
+const leafletMarkers = {};
+
+function createIcon(v, size=14) {
+  const c = TYPE_COLOR[v.type];
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size*3}" height="${size*3}" viewBox="0 0 42 42">
+    <circle cx="21" cy="21" r="18" fill="${c}18"/>
+    <circle cx="21" cy="21" r="10" fill="${c}40" stroke="${c}" stroke-width="1.5">
+      <animate attributeName="r" values="10;17;10" dur="2.5s" repeatCount="indefinite"/>
+      <animate attributeName="opacity" values="1;0;1" dur="2.5s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="21" cy="21" r="7" fill="${c}" stroke="white" stroke-width="1.5"/>
+    <text x="21" y="25" text-anchor="middle" font-size="8" font-weight="700" fill="white" font-family="sans-serif">${v.id}</text>
+  </svg>`;
+  return L.divIcon({
+    html: svg,
+    className: '',
+    iconSize: [size*3, size*3],
+    iconAnchor: [size*1.5, size*1.5],
+    popupAnchor: [0, -size*1.5],
+  });
+}
+
+VESSELS.forEach(v => {
+  const marker = L.marker([v.lat, v.lon], { icon: createIcon(v) });
+  const typeColor = TYPE_COLOR[v.type];
+
+  marker.bindPopup(`
+    <div class="popup-inner">
+      <div class="popup-num">VESSEL #${String(v.id).padStart(2,'0')}</div>
+      <div class="popup-name">${v.name}</div>
+      <div class="popup-row">
+        <span class="popup-label">Flag State</span>
+        <span class="popup-val vi-eez eez-${v.eez}" style="padding:2px 8px;border-radius:10px">${v.flag}</span>
+      </div>
+      <div class="popup-row">
+        <span class="popup-label">Offense</span>
+        <span class="popup-val" style="color:${typeColor}">${v.reason}</span>
+      </div>
+      <div class="popup-coords">${v.lat.toFixed(4)}°N &nbsp;/&nbsp; ${Math.abs(v.lon).toFixed(4)}°W</div>
+    </div>
+  `, { maxWidth: 260, className: '' });
+
+  marker.on('click', () => {
+    const el = document.getElementById('vi-'+v.id);
+    el?.scrollIntoView({ behavior:'smooth', block:'nearest' });
+    document.querySelectorAll('.vessel-item').forEach(e => e.classList.remove('active'));
+    el?.classList.add('active');
+  });
+
+  marker.addTo(map);
+  leafletMarkers[v.id] = marker;
+});
+
+// ── SIDEBAR VESSEL CARDS ──
+const listEl = document.getElementById('vessel-list');
+VESSELS.forEach(v => {
+  const c = TYPE_COLOR[v.type];
+  const div = document.createElement('div');
+  div.className = 'vessel-item';
+  div.id = 'vi-' + v.id;
+  div.setAttribute('data-type', v.type);
+  div.innerHTML = `
+    <div style="position:absolute;left:0;top:0;bottom:0;width:3px;background:${c};border-radius:3px 0 0 3px"></div>
+    <div class="vi-top">
+      <div class="vi-num">#${String(v.id).padStart(2,'0')}</div>
+      <div class="vi-name">${v.name}</div>
+      <div class="vi-eez eez-${v.eez}">${v.flag}</div>
+    </div>
+    <div class="vi-reason">${v.reason}</div>
+    <div class="vi-coords">${v.lat.toFixed(4)}°N · ${Math.abs(v.lon).toFixed(4)}°W</div>
+  `;
+  div.addEventListener('click', () => {
+    document.querySelectorAll('.vessel-item').forEach(e => e.classList.remove('active'));
+    div.classList.add('active');
+    map.flyTo([v.lat, v.lon], 9, { animate:true, duration:0.8 });
+    leafletMarkers[v.id].openPopup();
+  });
+  listEl.appendChild(div);
+});
+
+// ── FILTER TABS ──
+document.getElementById('filter-tabs').addEventListener('click', e => {
+  const tab = e.target.closest('.ftab');
+  if (!tab) return;
+  const f = tab.dataset.filter;
+  document.querySelectorAll('.ftab').forEach(t => t.classList.remove('active'));
+  tab.classList.add('active');
+
+  document.querySelectorAll('.vessel-item').forEach(item => {
+    if (f === 'all' || item.dataset.type === f) item.classList.remove('hidden');
+    else item.classList.add('hidden');
+  });
+
+  VESSELS.forEach(v => {
+    const m = leafletMarkers[v.id];
+    if (f === 'all' || v.type === f) {
+      if (!map.hasLayer(m)) map.addLayer(m);
+    } else {
+      if (map.hasLayer(m)) map.removeLayer(m);
+    }
+  });
+});
+
+function highlightVessel(id) {
+  document.querySelectorAll('.vessel-item').forEach(e => e.classList.remove('active'));
+  document.getElementById('vi-'+id)?.classList.add('active');
+}
+
+// ── FIT BOUNDS to all vessels ──
+const allCoords = VESSELS.map(v => [v.lat, v.lon]);
+map.fitBounds(L.latLngBounds(allCoords).pad(0.18));
+
+// ── TOAST ──
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+setTimeout(() => showToast('Click any vessel to inspect details'), 800);
+</script>
+</body>
+</html>
